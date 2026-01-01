@@ -215,6 +215,16 @@ impl ProjectAnalyzer {
             }
         }
 
+        // Merge DRY Analysis
+        for block in local_result.dry.duplicated_blocks {
+            if !global_results.dry.duplicated_blocks.contains(&block) {
+                global_results.dry.duplicated_blocks.push(block);
+            }
+        }
+        if local_result.dry.duplication_score > global_results.dry.duplication_score {
+            global_results.dry.duplication_score = local_result.dry.duplication_score;
+        }
+
         // Merge Tech Stack
         for f in local_result.tech_stack.frameworks {
             if !global_results.tech_stack.frameworks.contains(&f) {

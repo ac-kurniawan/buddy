@@ -7,22 +7,21 @@ impl ReportGenerator {
         let mut report = String::new();
         let dominant_lang = Self::get_dominant_language(result);
 
-        report.push_str("# Project Guideline\n\n");
+        report.push_str("# CLAUDE.md\n\n");
         report.push_str(&format!("> **Dominant Language**: {}\n\n", dominant_lang));
 
-        // 0. Tech Stack & Architecture
-        report.push_str("## 0. Tech Stack & Architecture\n");
-        report.push_str(&format!("- **Architecture Pattern**: {}\n", Self::format_val(&result.architecture.pattern)));
-        if !result.architecture.layers.is_empty() {
-            report.push_str(&format!("- **Architecture Layers**: {}\n", Self::format_bullet_list(&result.architecture.layers)));
-        }
-        report.push_str(&format!("- **Frameworks**: {}\n", Self::format_bullet_list(&result.tech_stack.frameworks)));
-        report.push_str(&format!("- **Databases**: {}\n", Self::format_bullet_list(&result.tech_stack.databases)));
-        report.push_str(&format!("- **Libraries**: {}\n", Self::format_bullet_list(&result.tech_stack.libraries)));
+        // 1. Build Commands
+        report.push_str("## Build Commands\n");
+        report.push_str(&Self::get_build_commands(&dominant_lang, result));
         report.push('\n');
 
-        // 1. Naming & Syntax Conventions
-        report.push_str("## 1. Naming & Syntax Conventions\n");
+        // 2. Test Commands
+        report.push_str("## Test Commands\n");
+        report.push_str(&Self::get_test_commands(&dominant_lang, result));
+        report.push('\n');
+
+        // 3. Code Style
+        report.push_str("## Code Style\n");
         report.push_str(&format!("- **Variable Casing**: {}\n", result.naming.variable_casing));
         report.push_str(&format!("- **Function Casing**: {}\n", result.naming.function_casing));
         report.push_str(&format!("- **Class/Struct Naming**: {}\n", result.naming.class_struct_naming));
@@ -33,6 +32,27 @@ impl ReportGenerator {
         report.push_str(&format!("- **Comment Style**: {}\n", Self::format_val(&result.naming.comment_style)));
         let naming_pattern = format!("{} {} {}", result.naming.variable_casing, result.naming.function_casing, result.naming.class_struct_naming);
         Self::append_context(&mut report, &dominant_lang, "naming", &naming_pattern);
+        report.push('\n');
+
+        // 4. Workflow
+        report.push_str("## Workflow\n");
+        report.push_str("- **Always** run tests before committing changes.\n");
+        report.push_str("- Use descriptive commit messages following Conventional Commits if possible.\n");
+        report.push_str("- Follow the existing architecture patterns described below.\n");
+        report.push('\n');
+
+        report.push_str("--- \n\n");
+        report.push_str("# Advanced Repository Analysis\n\n");
+
+        // 0. Tech Stack & Architecture
+        report.push_str("## 0. Tech Stack & Architecture\n");
+        report.push_str(&format!("- **Architecture Pattern**: {}\n", Self::format_val(&result.architecture.pattern)));
+        if !result.architecture.layers.is_empty() {
+            report.push_str(&format!("- **Architecture Layers**: {}\n", Self::format_bullet_list(&result.architecture.layers)));
+        }
+        report.push_str(&format!("- **Frameworks**: {}\n", Self::format_bullet_list(&result.tech_stack.frameworks)));
+        report.push_str(&format!("- **Databases**: {}\n", Self::format_bullet_list(&result.tech_stack.databases)));
+        report.push_str(&format!("- **Libraries**: {}\n", Self::format_bullet_list(&result.tech_stack.libraries)));
         report.push('\n');
 
         // 2. Dependency Injection (DI) & Coupling
@@ -86,8 +106,20 @@ impl ReportGenerator {
         Self::append_context(&mut report, &dominant_lang, "design_patterns", &patterns);
         report.push('\n');
 
+        // 8. DRY Analysis
+        report.push_str("## 8. DRY Analysis\n");
+        let duplication = if result.dry.duplicated_blocks.is_empty() {
+            "No significant duplication detected".to_string()
+        } else {
+            Self::format_bullet_list(&result.dry.duplicated_blocks)
+        };
+        report.push_str(&format!("- **Duplicated Blocks**: {}\n", duplication));
+        report.push_str(&format!("- **Duplication Score**: {:.2}\n", result.dry.duplication_score));
+        Self::append_context(&mut report, &dominant_lang, "dry", &duplication);
+        report.push('\n');
+
         if let Some(llm_summary) = &result.llm_summary {
-            report.push_str("## 8. LLM Analysis Insights\n");
+            report.push_str("## 9. LLM Analysis Insights\n");
             report.push_str(llm_summary);
             report.push('\n');
         }
@@ -100,6 +132,26 @@ impl ReportGenerator {
             .max_by_key(|&(_, count)| count)
             .map(|(lang, _)| lang.clone())
             .unwrap_or_else(|| "Unknown".to_string())
+    }
+
+    fn get_build_commands(lang: &str, _result: &AnalysisResult) -> String {
+        match lang {
+            "Go" => "- `go build ./...`: Build all packages\n- `go mod tidy`: Clean up dependencies\n".to_string(),
+            "Rust" => "- `cargo build`: Build the project\n- `cargo build --release`: Build for production\n".to_string(),
+            "TypeScript" | "JavaScript" => "- `npm run build` or `yarn build`: Build the project\n- `npm install`: Install dependencies\n".to_string(),
+            "Python" => "- `pip install -r requirements.txt`: Install dependencies\n- `python setup.py build`: Build if applicable\n".to_string(),
+            _ => "- N/A: No build command detected\n".to_string(),
+        }
+    }
+
+    fn get_test_commands(lang: &str, _result: &AnalysisResult) -> String {
+        match lang {
+            "Go" => "- `go test ./...`: Run all tests\n- `go test -v ./...`: Run tests with verbose output\n".to_string(),
+            "Rust" => "- `cargo test`: Run all tests\n- `cargo test -- --nocapture`: Run tests with stdout enabled\n".to_string(),
+            "TypeScript" | "JavaScript" => "- `npm test` or `yarn test`: Run tests\n- `npm run test:watch`: Run tests in watch mode\n".to_string(),
+            "Python" => "- `pytest`: Run tests using pytest\n- `python -m unittest discover`: Run tests using unittest\n".to_string(),
+            _ => "- N/A: No test command detected\n".to_string(),
+        }
     }
 
     fn format_val(val: &str) -> String {
@@ -182,6 +234,12 @@ impl ReportGenerator {
                         Some("Gunakan `camelCase` untuk internal (unexported) variabel dan fungsi guna menjaga enkapsulasi package.".to_string())
                     )
                 } else { (None, None) }
+            },
+            ("Go", "dry") => {
+                (
+                    Some("Prinsip DRY (Don't Repeat Yourself) sangat penting untuk menjaga kemudahan pemeliharaan kode Go.".to_string()),
+                    Some("Gunakan fungsi utilitas atau helper untuk logika yang berulang, terutama jika logika tersebut digunakan di beberapa package.".to_string())
+                )
             },
             ("Python", "naming") => {
                 if found_pattern.contains("snake_case") {

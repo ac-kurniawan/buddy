@@ -12,6 +12,7 @@ impl LanguageAnalyzer for RustAnalyzer {
         self.analyze_naming(content, tree, &ts_lang, result);
         self.analyze_tech_stack(content, tree, &ts_lang, result);
         self.analyze_error_handling(content, tree, &ts_lang, result);
+        self.analyze_dry(content, tree, &ts_lang, result);
     }
 }
 
@@ -130,6 +131,32 @@ impl RustAnalyzer {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fn analyze_dry(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
+        let query_str = r#"
+            (string_literal) @string
+        "#;
+        let query = Query::new(lang, query_str).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
+
+        let mut strings = std::collections::HashMap::new();
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let text = &content[capture.node.start_byte()..capture.node.end_byte()];
+                if text.len() > 10 {
+                    *strings.entry(text).or_insert(0) += 1;
+                }
+            }
+        }
+
+        for (text, count) in strings {
+            if count > 1 {
+                result.dry.duplicated_blocks.push(format!("String literal repeated {} times: {}", count, text));
+                result.dry.duplication_score += (count - 1) as f64 * 0.1;
             }
         }
     }

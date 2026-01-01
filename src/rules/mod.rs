@@ -8,6 +8,7 @@ pub mod architecture;
 pub mod tech_stack;
 
 pub mod design_patterns;
+pub mod dry;
 
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
@@ -23,6 +24,7 @@ pub struct AnalysisResult {
     pub design_patterns: design_patterns::DesignPatternAnalysis,
     pub architecture: architecture::ArchitectureAnalysis,
     pub tech_stack: tech_stack::TechStack,
+    pub dry: dry::DRYAnalysis,
     pub language_counts: HashMap<String, usize>,
     pub llm_summary: Option<String>,
 }

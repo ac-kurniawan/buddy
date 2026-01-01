@@ -13,7 +13,7 @@ struct Args {
     path: String,
 
     /// Output file name
-    #[arg(short, long, default_value = "guideline.md")]
+    #[arg(short, long, default_value = "CLAUDE.md")]
     output: String,
 
     /// Use LLM (Google Gemini) for more accurate analysis

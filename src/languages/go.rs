@@ -16,6 +16,7 @@ impl LanguageAnalyzer for GoAnalyzer {
         self.analyze_design_patterns(content, tree, &ts_lang, result);
         self.analyze_testing(content, tree, &ts_lang, result);
         self.analyze_tech_stack(content, tree, &ts_lang, result);
+        self.analyze_dry(content, tree, &ts_lang, result);
     }
 }
 
@@ -240,6 +241,32 @@ impl GoAnalyzer {
             }
         }
     }
+
+    fn analyze_dry(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
+        let query_str = r#"
+            (interpreted_string_literal) @string
+        "#;
+        let query = Query::new(lang, query_str).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
+
+        let mut strings = std::collections::HashMap::new();
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let text = &content[capture.node.start_byte()..capture.node.end_byte()];
+                if text.len() > 10 { // Only track reasonably long strings
+                    *strings.entry(text).or_insert(0) += 1;
+                }
+            }
+        }
+
+        for (text, count) in strings {
+            if count > 1 {
+                result.dry.duplicated_blocks.push(format!("String literal repeated {} times: {}", count, text));
+                result.dry.duplication_score += (count - 1) as f64 * 0.1;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -295,5 +322,29 @@ mod tests {
         analyzer.analyze(content, &tree, &mut result);
         
         assert!(result.error_handling.failure_patterns.contains(&"if err != nil".to_string()));
+    }
+
+    #[test]
+    fn test_go_dry_analysis() {
+        let content = r#"
+            package main
+            func main() {
+                val1 := "this is a long repeated string"
+                val2 := "this is a long repeated string"
+                println(val1, val2)
+            }
+        "#;
+        
+        let mut parser = Parser::new();
+        parser.set_language(&tree_sitter_go::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(content, None).unwrap();
+        
+        let analyzer = GoAnalyzer;
+        let mut result = AnalysisResult::default();
+        analyzer.analyze(content, &tree, &mut result);
+        
+        assert!(result.dry.duplication_score > 0.0);
+        assert!(!result.dry.duplicated_blocks.is_empty());
+        assert!(result.dry.duplicated_blocks[0].contains("this is a long repeated string"));
     }
 }

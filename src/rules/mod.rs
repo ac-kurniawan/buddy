@@ -4,6 +4,8 @@ pub mod testing;
 pub mod config;
 pub mod security;
 pub mod error_handling;
+pub mod architecture;
+pub mod tech_stack;
 
 pub mod design_patterns;
 
@@ -19,6 +21,8 @@ pub struct AnalysisResult {
     pub security: security::SecurityAnalysis,
     pub error_handling: error_handling::ErrorHandlingAnalysis,
     pub design_patterns: design_patterns::DesignPatternAnalysis,
+    pub architecture: architecture::ArchitectureAnalysis,
+    pub tech_stack: tech_stack::TechStack,
     pub language_counts: HashMap<String, usize>,
     pub llm_summary: Option<String>,
 }

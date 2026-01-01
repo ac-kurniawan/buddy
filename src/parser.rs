@@ -7,6 +7,7 @@ pub enum SupportedLanguage {
     Python,
     TypeScript,
     JavaScript,
+    Rust,
 }
 
 impl SupportedLanguage {
@@ -16,6 +17,7 @@ impl SupportedLanguage {
             SupportedLanguage::Python => "Python",
             SupportedLanguage::TypeScript => "TypeScript",
             SupportedLanguage::JavaScript => "JavaScript",
+            SupportedLanguage::Rust => "Rust",
         }
     }
 }
@@ -32,6 +34,7 @@ impl CodeParser {
             "go" => (SupportedLanguage::Go, tree_sitter_go::LANGUAGE.into()),
             "py" => (SupportedLanguage::Python, tree_sitter_python::LANGUAGE.into()),
             "ts" | "tsx" | "js" | "jsx" => (SupportedLanguage::TypeScript, tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into()),
+            "rs" => (SupportedLanguage::Rust, tree_sitter_rust::LANGUAGE.into()),
             _ => return None,
         };
 

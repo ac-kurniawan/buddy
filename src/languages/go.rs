@@ -1,6 +1,6 @@
 use crate::languages::LanguageAnalyzer;
 use crate::rules::AnalysisResult;
-use crate::rules::naming::NamingConvention;
+use crate::rules::naming::{NamingConvention, Casing};
 use tree_sitter::Query;
 use streaming_iterator::StreamingIterator;
 
@@ -15,10 +15,48 @@ impl LanguageAnalyzer for GoAnalyzer {
         self.analyze_di(content, tree, &ts_lang, result);
         self.analyze_design_patterns(content, tree, &ts_lang, result);
         self.analyze_testing(content, tree, &ts_lang, result);
+        self.analyze_tech_stack(content, tree, &ts_lang, result);
     }
 }
 
 impl GoAnalyzer {
+    fn analyze_tech_stack(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
+        let query_str = r#"
+            (import_spec path: (interpreted_string_literal) @import_path)
+        "#;
+        let query = Query::new(lang, query_str).unwrap();
+        let mut cursor = tree_sitter::QueryCursor::new();
+        let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
+
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let node = capture.node;
+                let path = content[node.start_byte()..node.end_byte()].trim_matches('"');
+                
+                let (category, name) = match path {
+                    p if p.contains("github.com/gin-gonic/gin") => (Some("framework"), "Gin"),
+                    p if p.contains("github.com/labstack/echo") => (Some("framework"), "Echo"),
+                    p if p.contains("github.com/gofiber/fiber") => (Some("framework"), "Fiber"),
+                    p if p.contains("gorm.io/gorm") => (Some("database"), "GORM"),
+                    p if p.contains("github.com/jmoiron/sqlx") => (Some("database"), "sqlx"),
+                    p if p.contains("google.golang.org/grpc") => (Some("library"), "gRPC"),
+                    p if p.contains("github.com/spf13/cobra") => (Some("library"), "Cobra"),
+                    p if p.contains("github.com/spf13/viper") => (Some("library"), "Viper"),
+                    _ => (None, ""),
+                };
+
+                if let Some(cat) = category {
+                    match cat {
+                        "framework" => if !result.tech_stack.frameworks.contains(&name.to_string()) { result.tech_stack.frameworks.push(name.to_string()) },
+                        "database" => if !result.tech_stack.databases.contains(&name.to_string()) { result.tech_stack.databases.push(name.to_string()) },
+                        "library" => if !result.tech_stack.libraries.contains(&name.to_string()) { result.tech_stack.libraries.push(name.to_string()) },
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn analyze_testing(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
         let query_str = r#"
             (import_spec path: (interpreted_string_literal) @import_path)
@@ -44,6 +82,9 @@ impl GoAnalyzer {
                     if result.testing.mocking_strategy.is_empty() || result.testing.mocking_strategy == "N/A" {
                         result.testing.mocking_strategy = "gomock".to_string();
                     }
+                }
+                if text.contains("github.com/stretchr/testify") {
+                    result.testing.assertion_style = "testify".to_string();
                 }
             }
         }
@@ -87,6 +128,7 @@ impl GoAnalyzer {
             }
         }
     }
+
     fn analyze_naming(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
         let query_str = r#"
             (function_declaration name: (identifier) @func_name)
@@ -94,6 +136,10 @@ impl GoAnalyzer {
             (type_spec name: (type_identifier) @type_name)
             (var_spec name: (identifier) @var_name)
             (short_var_declaration left: (expression_list (identifier) @var_name))
+            (type_spec
+                name: (type_identifier) @interface_name
+                type: (interface_type)
+            )
         "#;
         
         let query = Query::new(lang, query_str).unwrap();
@@ -109,18 +155,23 @@ impl GoAnalyzer {
                 let capture_name = query.capture_names()[capture.index as usize];
                 match capture_name {
                     "func_name" | "method_name" => {
-                        if result.naming.function_casing.is_empty() {
-                            result.naming.function_casing = casing.to_string();
+                        if result.naming.function_casing == Casing::Unknown {
+                            result.naming.function_casing = casing;
                         }
                     },
                     "type_name" => {
-                        if result.naming.class_struct_naming.is_empty() {
-                            result.naming.class_struct_naming = casing.to_string();
+                        if result.naming.class_struct_naming == Casing::Unknown {
+                            result.naming.class_struct_naming = casing;
                         }
                     },
                     "var_name" => {
-                        if result.naming.variable_casing.is_empty() {
-                            result.naming.variable_casing = casing.to_string();
+                        if result.naming.variable_casing == Casing::Unknown {
+                            result.naming.variable_casing = casing;
+                        }
+                    },
+                    "interface_name" => {
+                        if name.starts_with('I') && name.chars().nth(1).map_or(false, |c| c.is_uppercase()) {
+                            result.naming.interface_prefix = Some("I".to_string());
                         }
                     },
                     _ => {}
@@ -138,16 +189,35 @@ impl GoAnalyzer {
                     right: (nil)
                 )
             ) @error_check
+            
+            (call_expression
+                function: (identifier) @func_name
+                (#match? @func_name "panic")
+            ) @panic_call
         "#;
         
         let query = Query::new(lang, query_str).unwrap();
         let mut cursor = tree_sitter::QueryCursor::new();
-        let mut captures = cursor.captures(&query, tree.root_node(), content.as_bytes());
+        let mut matches = cursor.matches(&query, tree.root_node(), content.as_bytes());
 
-        while let Some(_) = captures.next() {
-            let pattern = "if err != nil".to_string();
-            if !result.error_handling.failure_patterns.contains(&pattern) {
-                result.error_handling.failure_patterns.push(pattern);
+        while let Some(m) = matches.next() {
+            for capture in m.captures {
+                let capture_name = query.capture_names()[capture.index as usize];
+                match capture_name {
+                    "error_check" => {
+                        let pattern = "if err != nil".to_string();
+                        if !result.error_handling.failure_patterns.contains(&pattern) {
+                            result.error_handling.failure_patterns.push(pattern);
+                        }
+                    },
+                    "panic_call" => {
+                        let pattern = "panic()".to_string();
+                        if !result.error_handling.failure_patterns.contains(&pattern) {
+                            result.error_handling.failure_patterns.push(pattern);
+                        }
+                    },
+                    _ => {}
+                }
             }
         }
     }
@@ -200,9 +270,9 @@ mod tests {
         let mut result = AnalysisResult::default();
         analyzer.analyze(content, &tree, &mut result);
         
-        assert_eq!(result.naming.function_casing, "PascalCase");
-        assert_eq!(result.naming.class_struct_naming, "PascalCase");
-        assert_eq!(result.naming.variable_casing, "camelCase");
+        assert_eq!(result.naming.function_casing, Casing::PascalCase);
+        assert_eq!(result.naming.class_struct_naming, Casing::PascalCase);
+        assert_eq!(result.naming.variable_casing, Casing::CamelCase);
     }
 
     #[test]

@@ -1,6 +1,7 @@
 pub mod go;
 pub mod python;
 pub mod javascript;
+pub mod rust;
 
 use crate::rules::AnalysisResult;
 use crate::parser::SupportedLanguage;
@@ -14,5 +15,6 @@ pub fn get_analyzer(lang: SupportedLanguage) -> Box<dyn LanguageAnalyzer + Send 
         SupportedLanguage::Go => Box::new(go::GoAnalyzer),
         SupportedLanguage::Python => Box::new(python::PythonAnalyzer),
         SupportedLanguage::TypeScript | SupportedLanguage::JavaScript => Box::new(javascript::JavaScriptAnalyzer),
+        SupportedLanguage::Rust => Box::new(rust::RustAnalyzer),
     }
 }

@@ -10,12 +10,26 @@ impl ReportGenerator {
         report.push_str("# Project Guideline\n\n");
         report.push_str(&format!("> **Dominant Language**: {}\n\n", dominant_lang));
 
+        // 0. Tech Stack & Architecture
+        report.push_str("## 0. Tech Stack & Architecture\n");
+        report.push_str(&format!("- **Architecture Pattern**: {}\n", Self::format_val(&result.architecture.pattern)));
+        if !result.architecture.layers.is_empty() {
+            report.push_str(&format!("- **Architecture Layers**: {}\n", Self::format_bullet_list(&result.architecture.layers)));
+        }
+        report.push_str(&format!("- **Frameworks**: {}\n", Self::format_bullet_list(&result.tech_stack.frameworks)));
+        report.push_str(&format!("- **Databases**: {}\n", Self::format_bullet_list(&result.tech_stack.databases)));
+        report.push_str(&format!("- **Libraries**: {}\n", Self::format_bullet_list(&result.tech_stack.libraries)));
+        report.push_str("\n");
+
         // 1. Naming & Syntax Conventions
         report.push_str("## 1. Naming & Syntax Conventions\n");
-        report.push_str(&format!("- **Variable Casing**: {}\n", Self::format_val(&result.naming.variable_casing)));
-        report.push_str(&format!("- **Function Casing**: {}\n", Self::format_val(&result.naming.function_casing)));
-        report.push_str(&format!("- **Class/Struct Naming**: {}\n", Self::format_val(&result.naming.class_struct_naming)));
-        report.push_str(&format!("- **File Naming**: {}\n", Self::format_val(&result.naming.file_naming)));
+        report.push_str(&format!("- **Variable Casing**: {}\n", result.naming.variable_casing));
+        report.push_str(&format!("- **Function Casing**: {}\n", result.naming.function_casing));
+        report.push_str(&format!("- **Class/Struct Naming**: {}\n", result.naming.class_struct_naming));
+        report.push_str(&format!("- **File Naming**: {}\n", result.naming.file_naming));
+        if let Some(prefix) = &result.naming.interface_prefix {
+            report.push_str(&format!("- **Interface Prefix**: `{}`\n", prefix));
+        }
         report.push_str(&format!("- **Comment Style**: {}\n", Self::format_val(&result.naming.comment_style)));
         let naming_pattern = format!("{} {} {}", result.naming.variable_casing, result.naming.function_casing, result.naming.class_struct_naming);
         Self::append_context(&mut report, &dominant_lang, "naming", &naming_pattern);
@@ -23,10 +37,10 @@ impl ReportGenerator {
 
         // 2. Dependency Injection (DI) & Coupling
         report.push_str("## 2. Dependency Injection (DI) & Coupling\n");
-        let di_pattern = Self::format_list(&result.di.injection_patterns);
+        let di_pattern = Self::format_bullet_list(&result.di.injection_patterns);
         report.push_str(&format!("- **Injection Pattern**: {}\n", di_pattern));
         report.push_str(&format!("- **Abstraction Level**: {:.2}\n", result.di.abstraction_level));
-        report.push_str(&format!("- **Global State Dependency**: {}\n", Self::format_list(&result.di.global_state_usage)));
+        report.push_str(&format!("- **Global State Dependency**: {}\n", Self::format_bullet_list(&result.di.global_state_usage)));
         Self::append_context(&mut report, &dominant_lang, "di", &di_pattern);
         report.push_str("\n");
 
@@ -41,7 +55,7 @@ impl ReportGenerator {
 
         // 4. Configuration & Environment Management
         report.push_str("## 4. Configuration & Environment Management\n");
-        report.push_str(&format!("- **Config Source**: {}\n", Self::format_list(&result.config.config_sources)));
+        report.push_str(&format!("- **Config Source**: {}\n", Self::format_bullet_list(&result.config.config_sources)));
         report.push_str(&format!("- **Type Safety**: {}\n", Self::format_val(&result.config.type_safety)));
         report.push_str(&format!("- **Secret Handling**: {}\n", Self::format_val(&result.config.secret_handling)));
         Self::append_context(&mut report, &dominant_lang, "config", &result.config.type_safety);
@@ -59,7 +73,7 @@ impl ReportGenerator {
 
         // 6. Error Handling Strategy
         report.push_str("## 6. Error Handling Strategy\n");
-        let error_pattern = Self::format_list(&result.error_handling.failure_patterns);
+        let error_pattern = Self::format_bullet_list(&result.error_handling.failure_patterns);
         report.push_str(&format!("- **Failure Pattern**: {}\n", error_pattern));
         report.push_str(&format!("- **Logging Consistency**: {}\n", Self::format_val(&result.error_handling.logging_consistency)));
         Self::append_context(&mut report, &dominant_lang, "error_handling", &error_pattern);
@@ -67,7 +81,7 @@ impl ReportGenerator {
 
         // 7. Design Patterns
         report.push_str("## 7. Design Patterns\n");
-        let patterns = Self::format_list(&result.design_patterns.patterns);
+        let patterns = Self::format_bullet_list(&result.design_patterns.patterns);
         report.push_str(&format!("- **Detected Patterns**: {}\n", patterns));
         Self::append_context(&mut report, &dominant_lang, "design_patterns", &patterns);
         report.push_str("\n");
@@ -96,11 +110,15 @@ impl ReportGenerator {
         }
     }
 
-    fn format_list(list: &[String]) -> String {
+    fn format_bullet_list(list: &[String]) -> String {
         if list.is_empty() {
             "N/A".to_string()
         } else {
-            list.join(", ")
+            let mut s = String::new();
+            for item in list {
+                s.push_str(&format!("\n  - {}", item));
+            }
+            s
         }
     }
 

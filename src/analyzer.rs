@@ -3,6 +3,7 @@ use ignore::WalkBuilder;
 use rayon::prelude::*;
 use crate::parser::CodeParser;
 use crate::rules::AnalysisResult;
+use crate::rules::naming::Casing;
 use std::sync::{Arc, Mutex};
 
 pub struct ProjectAnalyzer {
@@ -45,6 +46,28 @@ impl ProjectAnalyzer {
         let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let file_name_lower = file_name.to_lowercase();
         
+        // Architecture detection based on directory structure
+        let mut layers = Vec::new();
+        let mut architecture_pattern = String::new();
+
+        if let Some(parent) = path.parent() {
+            let parent_str = parent.to_string_lossy();
+            if parent_str.contains("domain") || parent_str.contains("usecase") || parent_str.contains("repository") || parent_str.contains("delivery") {
+                architecture_pattern = "Clean Architecture".to_string();
+                if parent_str.contains("domain") { layers.push("Domain".to_string()); }
+                if parent_str.contains("usecase") { layers.push("UseCase".to_string()); }
+                if parent_str.contains("repository") { layers.push("Repository".to_string()); }
+                if parent_str.contains("delivery") || parent_str.contains("handler") { layers.push("Delivery/Handler".to_string()); }
+            } else if parent_str.contains("controller") || parent_str.contains("model") || parent_str.contains("view") {
+                architecture_pattern = "MVC".to_string();
+                if parent_str.contains("controller") { layers.push("Controller".to_string()); }
+                if parent_str.contains("model") { layers.push("Model".to_string()); }
+                if parent_str.contains("view") { layers.push("View".to_string()); }
+            } else if parent_str.contains("internal") || parent_str.contains("pkg") || parent_str.contains("cmd") {
+                architecture_pattern = "Standard Go Layout".to_string();
+            }
+        }
+
         // Heuristic for Config Sources
         if path.extension().map_or(false, |ext| ext == "env" || ext == "yaml" || ext == "yml" || ext == "json") 
            || file_name_lower.contains("config") || file_name_lower == "properties.yaml" {
@@ -61,6 +84,19 @@ impl ProjectAnalyzer {
              if file_name_lower == "properties.yaml" {
                  global_results.config.type_safety = "Structured (Properties)".to_string();
              }
+        }
+
+        // Merge architecture info
+        if !architecture_pattern.is_empty() {
+            let mut global_results = results.lock().unwrap();
+            if global_results.architecture.pattern.is_empty() {
+                global_results.architecture.pattern = architecture_pattern;
+            }
+            for layer in layers {
+                if !global_results.architecture.layers.contains(&layer) {
+                    global_results.architecture.layers.push(layer);
+                }
+            }
         }
     }
 
@@ -98,7 +134,7 @@ impl ProjectAnalyzer {
         // Update naming conventions for file
         if !file_name.is_empty() {
             if let Some(file_stem) = path.file_stem().and_then(|n| n.to_str()) {
-                local_result.naming.file_naming = crate::rules::naming::NamingConvention::detect_casing(file_stem).to_string();
+                local_result.naming.file_naming = crate::rules::naming::NamingConvention::detect_casing(file_stem);
             }
             
             // Heuristic for Test Location
@@ -123,18 +159,21 @@ impl ProjectAnalyzer {
         // Update language counts
         *global_results.language_counts.entry(parser.language.as_str().to_string()).or_insert(0) += 1;
         
-        // Merge results (strategi penggabungan sederhana: ambil yang pertama ditemukan jika belum ada)
-        if global_results.naming.variable_casing.is_empty() {
+        // Merge results
+        if global_results.naming.variable_casing == Casing::Unknown {
             global_results.naming.variable_casing = local_result.naming.variable_casing;
         }
-        if global_results.naming.function_casing.is_empty() {
+        if global_results.naming.function_casing == Casing::Unknown {
             global_results.naming.function_casing = local_result.naming.function_casing;
         }
-        if global_results.naming.class_struct_naming.is_empty() {
+        if global_results.naming.class_struct_naming == Casing::Unknown {
             global_results.naming.class_struct_naming = local_result.naming.class_struct_naming;
         }
-        if global_results.naming.file_naming.is_empty() {
+        if global_results.naming.file_naming == Casing::Unknown {
             global_results.naming.file_naming = local_result.naming.file_naming;
+        }
+        if global_results.naming.interface_prefix.is_none() {
+            global_results.naming.interface_prefix = local_result.naming.interface_prefix;
         }
 
         if global_results.testing.test_location.is_empty() {
@@ -145,6 +184,9 @@ impl ProjectAnalyzer {
         }
         if global_results.testing.mocking_strategy.is_empty() || global_results.testing.mocking_strategy == "N/A" {
             global_results.testing.mocking_strategy = local_result.testing.mocking_strategy;
+        }
+        if global_results.testing.assertion_style.is_empty() {
+            global_results.testing.assertion_style = local_result.testing.assertion_style;
         }
 
         if global_results.config.type_safety.is_empty() || global_results.config.type_safety == "N/A" {
@@ -172,6 +214,23 @@ impl ProjectAnalyzer {
         for pattern in local_result.design_patterns.patterns {
             if !global_results.design_patterns.patterns.contains(&pattern) {
                 global_results.design_patterns.patterns.push(pattern);
+            }
+        }
+
+        // Merge Tech Stack
+        for f in local_result.tech_stack.frameworks {
+            if !global_results.tech_stack.frameworks.contains(&f) {
+                global_results.tech_stack.frameworks.push(f);
+            }
+        }
+        for l in local_result.tech_stack.libraries {
+            if !global_results.tech_stack.libraries.contains(&l) {
+                global_results.tech_stack.libraries.push(l);
+            }
+        }
+        for d in local_result.tech_stack.databases {
+            if !global_results.tech_stack.databases.contains(&d) {
+                global_results.tech_stack.databases.push(d);
             }
         }
     }

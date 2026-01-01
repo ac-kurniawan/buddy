@@ -69,7 +69,7 @@ impl ProjectAnalyzer {
         }
 
         // Heuristic for Config Sources
-        if path.extension().map_or(false, |ext| ext == "env" || ext == "yaml" || ext == "yml" || ext == "json") 
+        if path.extension().is_some_and(|ext| ext == "env" || ext == "yaml" || ext == "yml" || ext == "json") 
            || file_name_lower.contains("config") || file_name_lower == "properties.yaml" {
              let mut global_results = results.lock().unwrap();
              let source = if file_name_lower == "properties.yaml" || file_name_lower == "application.yaml" {
@@ -107,11 +107,9 @@ impl ProjectAnalyzer {
             .git_ignore(true)
             .build();
 
-        for entry in walker {
-            if let Ok(entry) = entry {
-                if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
-                    files.push(entry.path().to_path_buf());
-                }
+        for entry in walker.flatten() {
+            if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                files.push(entry.path().to_path_buf());
             }
         }
         files

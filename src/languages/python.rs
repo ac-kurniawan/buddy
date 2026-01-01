@@ -17,8 +17,8 @@ impl LanguageAnalyzer for PythonAnalyzer {
 impl PythonAnalyzer {
     fn analyze_tech_stack(&self, content: &str, tree: &tree_sitter::Tree, lang: &tree_sitter::Language, result: &mut AnalysisResult) {
         let query_str = r#"
-            (import_from_statement module: (dotted_name) @module_name)
-            (import_statement name: (dotted_name) @module_name)
+            (import_from_statement (dotted_name) @module_name)
+            (import_statement (dotted_name) @module_name)
         "#;
         let query = Query::new(lang, query_str).unwrap();
         let mut cursor = tree_sitter::QueryCursor::new();

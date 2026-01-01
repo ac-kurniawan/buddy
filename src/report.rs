@@ -19,7 +19,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Frameworks**: {}\n", Self::format_bullet_list(&result.tech_stack.frameworks)));
         report.push_str(&format!("- **Databases**: {}\n", Self::format_bullet_list(&result.tech_stack.databases)));
         report.push_str(&format!("- **Libraries**: {}\n", Self::format_bullet_list(&result.tech_stack.libraries)));
-        report.push_str("\n");
+        report.push('\n');
 
         // 1. Naming & Syntax Conventions
         report.push_str("## 1. Naming & Syntax Conventions\n");
@@ -33,7 +33,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Comment Style**: {}\n", Self::format_val(&result.naming.comment_style)));
         let naming_pattern = format!("{} {} {}", result.naming.variable_casing, result.naming.function_casing, result.naming.class_struct_naming);
         Self::append_context(&mut report, &dominant_lang, "naming", &naming_pattern);
-        report.push_str("\n");
+        report.push('\n');
 
         // 2. Dependency Injection (DI) & Coupling
         report.push_str("## 2. Dependency Injection (DI) & Coupling\n");
@@ -42,7 +42,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Abstraction Level**: {:.2}\n", result.di.abstraction_level));
         report.push_str(&format!("- **Global State Dependency**: {}\n", Self::format_bullet_list(&result.di.global_state_usage)));
         Self::append_context(&mut report, &dominant_lang, "di", &di_pattern);
-        report.push_str("\n");
+        report.push('\n');
 
         // 3. Testing Culture & Style
         report.push_str("## 3. Testing Culture & Style\n");
@@ -51,7 +51,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Naming Pattern**: {}\n", Self::format_val(&result.testing.naming_pattern)));
         report.push_str(&format!("- **Assertion Style**: {}\n", Self::format_val(&result.testing.assertion_style)));
         Self::append_context(&mut report, &dominant_lang, "testing", &result.testing.test_location);
-        report.push_str("\n");
+        report.push('\n');
 
         // 4. Configuration & Environment Management
         report.push_str("## 4. Configuration & Environment Management\n");
@@ -59,7 +59,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Type Safety**: {}\n", Self::format_val(&result.config.type_safety)));
         report.push_str(&format!("- **Secret Handling**: {}\n", Self::format_val(&result.config.secret_handling)));
         Self::append_context(&mut report, &dominant_lang, "config", &result.config.type_safety);
-        report.push_str("\n");
+        report.push('\n');
 
         // 5. Security & Safety Baseline
         report.push_str("## 5. Security & Safety Baseline\n");
@@ -69,7 +69,7 @@ impl ReportGenerator {
         report.push_str(&format!("- **Memory Safety**: {}\n", Self::format_val(&result.security.memory_safety)));
         report.push_str(&format!("- **Concurrency Safety**: {}\n", Self::format_val(&result.security.concurrency_safety)));
         Self::append_context(&mut report, &dominant_lang, "security", secrets_found);
-        report.push_str("\n");
+        report.push('\n');
 
         // 6. Error Handling Strategy
         report.push_str("## 6. Error Handling Strategy\n");
@@ -77,19 +77,19 @@ impl ReportGenerator {
         report.push_str(&format!("- **Failure Pattern**: {}\n", error_pattern));
         report.push_str(&format!("- **Logging Consistency**: {}\n", Self::format_val(&result.error_handling.logging_consistency)));
         Self::append_context(&mut report, &dominant_lang, "error_handling", &error_pattern);
-        report.push_str("\n");
+        report.push('\n');
 
         // 7. Design Patterns
         report.push_str("## 7. Design Patterns\n");
         let patterns = Self::format_bullet_list(&result.design_patterns.patterns);
         report.push_str(&format!("- **Detected Patterns**: {}\n", patterns));
         Self::append_context(&mut report, &dominant_lang, "design_patterns", &patterns);
-        report.push_str("\n");
+        report.push('\n');
 
         if let Some(llm_summary) = &result.llm_summary {
             report.push_str("## 8. LLM Analysis Insights\n");
             report.push_str(llm_summary);
-            report.push_str("\n");
+            report.push('\n');
         }
 
         report

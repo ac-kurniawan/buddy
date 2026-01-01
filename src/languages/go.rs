@@ -78,10 +78,9 @@ impl GoAnalyzer {
                 let node = capture.node;
                 let text = &content[node.start_byte()..node.end_byte()];
                 
-                if text.contains("gomock") {
-                    if result.testing.mocking_strategy.is_empty() || result.testing.mocking_strategy == "N/A" {
-                        result.testing.mocking_strategy = "gomock".to_string();
-                    }
+                if text.contains("gomock") 
+                    && (result.testing.mocking_strategy.is_empty() || result.testing.mocking_strategy == "N/A") {
+                    result.testing.mocking_strategy = "gomock".to_string();
                 }
                 if text.contains("github.com/stretchr/testify") {
                     result.testing.assertion_style = "testify".to_string();
@@ -170,7 +169,7 @@ impl GoAnalyzer {
                         }
                     },
                     "interface_name" => {
-                        if name.starts_with('I') && name.chars().nth(1).map_or(false, |c| c.is_uppercase()) {
+                        if name.starts_with('I') && name.chars().nth(1).is_some_and(|c| c.is_uppercase()) {
                             result.naming.interface_prefix = Some("I".to_string());
                         }
                     },
@@ -234,7 +233,7 @@ impl GoAnalyzer {
         let mut cursor = tree_sitter::QueryCursor::new();
         let mut captures = cursor.captures(&query, tree.root_node(), content.as_bytes());
 
-        while let Some(_) = captures.next() {
+        while captures.next().is_some() {
             let pattern = "Constructor Injection (NewXXX)".to_string();
             if !result.di.injection_patterns.contains(&pattern) {
                 result.di.injection_patterns.push(pattern);

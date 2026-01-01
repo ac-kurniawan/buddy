@@ -100,7 +100,7 @@ impl GeminiClient {
             Please provide the output in Markdown format with the following sections if applicable:
             - Executive Summary
             - Detailed Analysis Insights (Naming, DI, Testing, Config, Security, Error Handling, Design Patterns)
-            - Strategic Recommendations
+            - Strategic Recommendations, you can add sample code snippets if applicable.
             
             Use Indonesian language for the analysis and recommendations.",
             result_json

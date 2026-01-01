@@ -45,7 +45,10 @@ jobs:
     name: Release
     needs: check
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
     steps:
@@ -54,13 +57,40 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ matrix.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ matrix.os }}-cargo-release-
+      
       - name: Build Release
         run: cargo build --release
+        
+      - name: Prepare Assets
+        shell: bash
+        run: |
+          BINARY_NAME="buddy"
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            mv target/release/${BINARY_NAME}.exe target/release/${BINARY_NAME}-${VERSION}-windows-amd64.exe
+            echo "ASSET_PATH=target/release/${BINARY_NAME}-${VERSION}-windows-amd64.exe" >> $GITHUB_ENV
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            mv target/release/${BINARY_NAME} target/release/${BINARY_NAME}-${VERSION}-macos-amd64
+            echo "ASSET_PATH=target/release/${BINARY_NAME}-${VERSION}-macos-amd64" >> $GITHUB_ENV
+          else
+            mv target/release/${BINARY_NAME} target/release/${BINARY_NAME}-${VERSION}-linux-amd64
+            echo "ASSET_PATH=target/release/${BINARY_NAME}-${VERSION}-linux-amd64" >> $GITHUB_ENV
+          fi
         
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/buddy
+          files: ${{ env.ASSET_PATH }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
